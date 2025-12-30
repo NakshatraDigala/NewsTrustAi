@@ -1,70 +1,67 @@
-import { useState } from "react";
-import { Newspaper, Globe, Hash, BookOpen, Radio, Zap } from "lucide-react";
+import googleNewsLogo from "@/assets/google-news-logo.png";
+import twitterLogo from "@/assets/twitter-logo.png";
+import facebookLogo from "@/assets/facebook-logo.png";
+import wikipediaLogo from "@/assets/wikipedia-logo.png";
+import theHinduLogo from "@/assets/the-hindu-logo.png";
+import deccanChronicleLogo from "@/assets/deccan-chronicle-logo.png";
+import way2newsLogo from "@/assets/way2news-logo.png";
+import inshortsLogo from "@/assets/inshorts-logo.png";
 
 export interface NewsSource {
   id: string;
   name: string;
-  icon: React.ReactNode;
+  logo: string;
   searchQuery: string;
-  color: string;
 }
 
 const NEWS_SOURCES: NewsSource[] = [
   {
     id: "google-news",
     name: "Google News",
-    icon: <Globe className="w-5 h-5" />,
+    logo: googleNewsLogo,
     searchQuery: "trending news today headlines",
-    color: "from-blue-500 to-green-500",
   },
   {
     id: "twitter",
     name: "X (Twitter)",
-    icon: <Hash className="w-5 h-5" />,
+    logo: twitterLogo,
     searchQuery: "trending topics twitter today viral",
-    color: "from-slate-700 to-slate-500",
   },
   {
     id: "facebook",
     name: "Facebook",
-    icon: <Radio className="w-5 h-5" />,
+    logo: facebookLogo,
     searchQuery: "facebook trending news viral posts",
-    color: "from-blue-600 to-blue-400",
   },
   {
     id: "wikipedia",
     name: "Wikipedia",
-    icon: <BookOpen className="w-5 h-5" />,
+    logo: wikipediaLogo,
     searchQuery: "wikipedia current events news today",
-    color: "from-gray-600 to-gray-400",
   },
   {
     id: "the-hindu",
     name: "The Hindu",
-    icon: <Newspaper className="w-5 h-5" />,
+    logo: theHinduLogo,
     searchQuery: "site:thehindu.com breaking news today",
-    color: "from-blue-800 to-blue-600",
   },
   {
     id: "deccan-chronicle",
     name: "Deccan Chronicle",
-    icon: <Newspaper className="w-5 h-5" />,
+    logo: deccanChronicleLogo,
     searchQuery: "site:deccanchronicle.com latest news",
-    color: "from-red-700 to-red-500",
   },
   {
     id: "way2news",
     name: "Way2News",
-    icon: <Zap className="w-5 h-5" />,
+    logo: way2newsLogo,
     searchQuery: "way2news trending india news short",
-    color: "from-orange-600 to-yellow-500",
   },
   {
     id: "inshorts",
     name: "Inshorts",
-    icon: <Zap className="w-5 h-5" />,
+    logo: inshortsLogo,
     searchQuery: "inshorts 60 words news today trending",
-    color: "from-purple-600 to-pink-500",
   },
 ];
 
@@ -100,12 +97,15 @@ export function SourceSelector({ selectedSource, onSelectSource, isLoading }: So
             >
               <div className={`
                 w-10 h-10 rounded-lg flex items-center justify-center
-                bg-gradient-to-br ${source.color}
-                text-white shadow-lg
-                ${isSelected ? 'animate-pulse' : 'group-hover:shadow-xl'}
+                bg-white/90 p-1.5
+                ${isSelected ? 'ring-2 ring-primary shadow-lg' : 'group-hover:shadow-xl'}
                 transition-all duration-300
               `}>
-                {source.icon}
+                <img 
+                  src={source.logo} 
+                  alt={`${source.name} logo`}
+                  className="w-full h-full object-contain"
+                />
               </div>
               <span className={`
                 text-xs font-medium text-center leading-tight
