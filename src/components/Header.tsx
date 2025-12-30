@@ -31,16 +31,6 @@ export function Header({ isRefreshing }: HeaderProps) {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <a 
-              href="https://docs.lovable.dev"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              How it works
-            </a>
-          </div>
         </div>
       </div>
     </header>
