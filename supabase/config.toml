@@ -3,5 +3,8 @@ project_id = "tqjqskbvoerabquldfiu"
 [functions.scrape-news]
 verify_jwt = false
 
+[functions.scrape-url]
+verify_jwt = false
+
 [functions.analyze-credibility]
 verify_jwt = false

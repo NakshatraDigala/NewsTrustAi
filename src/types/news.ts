@@ -4,6 +4,7 @@ export interface NewsArticle {
   id: string;
   headline: string;
   excerpt: string;
+  fullContent?: string;
   source: string;
   url?: string;
   timestamp: string;
@@ -11,10 +12,17 @@ export interface NewsArticle {
   trustLevel?: TrustLevel;
   confidence?: number;
   reasoning?: string;
+  details?: {
+    languageTone: string;
+    sourceCredibility: string;
+    factualIndicators: string;
+    redFlags: string[];
+  };
 }
 
 export interface ScrapeResponse {
   success: boolean;
+  article?: NewsArticle;
   articles?: NewsArticle[];
   error?: string;
 }
@@ -24,5 +32,11 @@ export interface AnalysisResponse {
   trustLevel?: TrustLevel;
   confidence?: number;
   reasoning?: string;
+  details?: {
+    languageTone: string;
+    sourceCredibility: string;
+    factualIndicators: string;
+    redFlags: string[];
+  };
   error?: string;
 }

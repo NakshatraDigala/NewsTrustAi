@@ -1,32 +1,61 @@
 import { Header } from "@/components/Header";
+import { UrlInput } from "@/components/UrlInput";
 import { NewsFeed } from "@/components/NewsFeed";
 import { TrustLegend } from "@/components/TrustLegend";
-import { useNewsStream } from "@/hooks/useNewsStream";
+import { useUrlAnalyzer } from "@/hooks/useUrlAnalyzer";
+import { Trash2 } from "lucide-react";
 
 const Index = () => {
-  const { articles, isLoading, isRefreshing, lastUpdated } = useNewsStream();
+  const { articles, isLoading, analyzeUrl, clearHistory } = useUrlAnalyzer();
+
+  const completedArticles = articles.filter(a => a.status === 'complete');
 
   return (
     <div className="min-h-screen">
-      <Header isRefreshing={isRefreshing || isLoading} lastUpdated={lastUpdated} />
+      <Header isRefreshing={isLoading} lastUpdated={null} />
       
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           {/* Hero section */}
-          <div className="text-center mb-10">
+          <div className="text-center mb-8">
             <h2 className="font-display text-3xl sm:text-4xl font-bold text-foreground mb-3">
-              Real-time News Analysis
+              Verify Any News Source
             </h2>
-            <p className="text-text-secondary max-w-xl mx-auto">
-              AI agents continuously scan news sources and analyze credibility signals.
-              No action required—just observe.
+            <p className="text-text-secondary max-w-xl mx-auto mb-8">
+              Paste a URL and our AI will analyze the content for credibility signals,
+              misinformation patterns, and trustworthiness in real-time.
             </p>
+            
+            {/* URL Input */}
+            <div className="max-w-2xl mx-auto">
+              <UrlInput onSubmit={analyzeUrl} isLoading={isLoading} />
+            </div>
           </div>
 
-          <div className="grid lg:grid-cols-4 gap-6">
+          <div className="grid lg:grid-cols-4 gap-6 mt-10">
             {/* Main feed */}
             <div className="lg:col-span-3">
-              <NewsFeed articles={articles} isLoading={isLoading} />
+              {articles.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-display font-semibold text-lg text-foreground">
+                      Analysis Results
+                    </h3>
+                    {articles.length > 0 && (
+                      <button
+                        onClick={clearHistory}
+                        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Clear History
+                      </button>
+                    )}
+                  </div>
+                  <NewsFeed articles={articles} isLoading={false} />
+                </div>
+              ) : (
+                <EmptyState />
+              )}
             </div>
 
             {/* Sidebar */}
@@ -37,26 +66,26 @@ const Index = () => {
                 {/* Stats card */}
                 <div className="glass-card rounded-xl p-4">
                   <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                    Live Stats
+                    Session Stats
                   </h3>
                   <div className="space-y-3">
                     <StatItem 
-                      label="Articles Analyzed" 
-                      value={articles.filter(a => a.status === 'complete').length} 
+                      label="URLs Analyzed" 
+                      value={completedArticles.length} 
                     />
                     <StatItem 
                       label="Likely True" 
-                      value={articles.filter(a => a.trustLevel === 'true').length}
+                      value={completedArticles.filter(a => a.trustLevel === 'true').length}
                       color="text-trust-true"
                     />
                     <StatItem 
                       label="Suspicious" 
-                      value={articles.filter(a => a.trustLevel === 'suspicious').length}
+                      value={completedArticles.filter(a => a.trustLevel === 'suspicious').length}
                       color="text-trust-suspicious"
                     />
                     <StatItem 
                       label="Likely False" 
-                      value={articles.filter(a => a.trustLevel === 'false').length}
+                      value={completedArticles.filter(a => a.trustLevel === 'false').length}
                       color="text-trust-false"
                     />
                   </div>
@@ -78,6 +107,28 @@ const Index = () => {
     </div>
   );
 };
+
+function EmptyState() {
+  return (
+    <div className="glass-card rounded-xl p-12 text-center">
+      <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-trust-true/20 via-trust-suspicious/20 to-trust-false/20 flex items-center justify-center">
+        <span className="text-4xl">🔍</span>
+      </div>
+      <h3 className="font-display font-semibold text-xl text-foreground mb-2">
+        Ready to Analyze
+      </h3>
+      <p className="text-text-secondary max-w-sm mx-auto">
+        Paste any news article, blog post, or website URL above to check its credibility in real-time.
+      </p>
+      <div className="mt-6 flex flex-wrap justify-center gap-2 text-xs text-text-tertiary">
+        <span className="px-3 py-1 rounded-full bg-muted">News Articles</span>
+        <span className="px-3 py-1 rounded-full bg-muted">Blog Posts</span>
+        <span className="px-3 py-1 rounded-full bg-muted">Social Media</span>
+        <span className="px-3 py-1 rounded-full bg-muted">Press Releases</span>
+      </div>
+    </div>
+  );
+}
 
 function StatItem({ 
   label, 

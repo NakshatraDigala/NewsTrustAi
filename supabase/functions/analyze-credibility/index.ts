@@ -8,6 +8,7 @@ const corsHeaders = {
 interface AnalysisRequest {
   headline: string;
   excerpt: string;
+  fullContent?: string;
   source: string;
 }
 
@@ -15,6 +16,12 @@ interface AnalysisResult {
   trustLevel: 'true' | 'suspicious' | 'false';
   confidence: number;
   reasoning: string;
+  details?: {
+    languageTone: string;
+    sourceCredibility: string;
+    factualIndicators: string;
+    redFlags: string[];
+  };
 }
 
 serve(async (req) => {
@@ -23,11 +30,11 @@ serve(async (req) => {
   }
 
   try {
-    const { headline, excerpt, source }: AnalysisRequest = await req.json();
+    const { headline, excerpt, fullContent, source }: AnalysisRequest = await req.json();
 
-    if (!headline) {
+    if (!headline && !excerpt && !fullContent) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Headline is required' }),
+        JSON.stringify({ success: false, error: 'Content is required for analysis' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -37,33 +44,55 @@ serve(async (req) => {
     if (!LOVABLE_API_KEY) {
       console.error('LOVABLE_API_KEY not configured');
       // Fallback to rule-based analysis
-      const result = analyzeWithRules(headline, excerpt, source);
+      const result = analyzeWithRules(headline, excerpt || fullContent || '', source);
       return new Response(
         JSON.stringify({ success: true, ...result }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Analyzing article: "${headline.slice(0, 50)}..."`);
+    // Use the full content if available for more thorough analysis
+    const contentToAnalyze = fullContent || excerpt || '';
+    console.log(`Analyzing content: "${headline?.slice(0, 50)}..." (${contentToAnalyze.length} chars)`);
 
-    const systemPrompt = `You are a misinformation detection AI. Analyze news headlines and excerpts for credibility signals.
+    const systemPrompt = `You are an expert misinformation and credibility analyst. Your job is to carefully analyze news articles, blog posts, and web content for credibility signals.
 
-IMPORTANT: You must respond with a valid JSON object and nothing else. Do not include any explanation outside the JSON.
+Analyze the provided content thoroughly and classify it into one of three categories:
+- "true": The content appears credible. It uses factual language, presents verifiable claims, cites sources, and comes from or references reputable outlets.
+- "suspicious": The content shows warning signs like emotional language, vague claims, missing context, unverified statistics, or one-sided perspectives. Needs verification.
+- "false": The content shows strong signs of misinformation like extreme/unsubstantiated claims, conspiracy language, obvious fabrication, or contradicts established facts.
 
-Classify articles into one of three categories:
-- "true": The article appears credible, uses factual language, cites sources, and avoids sensationalism
-- "suspicious": The article shows some warning signs like emotional language, vague claims, or missing context
-- "false": The article shows strong signs of misinformation like extreme claims, conspiracy language, or obvious fabrication
+Analyze these factors:
+1. Language Tone: Is it neutral and factual or sensational and emotional?
+2. Source Credibility: Is this from a known reputable outlet or unknown source?
+3. Claim Specificity: Are claims specific and verifiable or vague and unsubstantiated?
+4. Evidence: Does it cite sources, data, or expert opinions?
+5. Bias Indicators: Does it present multiple perspectives or push a single narrative?
+6. Red Flags: Clickbait headlines, conspiracy language, emotional manipulation, unverified quotes
 
-Consider these factors:
-1. Language tone (neutral vs sensational)
-2. Claim specificity (verifiable details vs vague statements)
-3. Source reputation (established outlets vs unknown sources)
-4. Logical consistency
-5. Use of emotional triggers or fear-mongering
+IMPORTANT: Respond ONLY with a valid JSON object in this exact format:
+{
+  "trustLevel": "true|suspicious|false",
+  "confidence": 0.0-1.0,
+  "reasoning": "2-3 sentence explanation of the classification",
+  "details": {
+    "languageTone": "Brief assessment",
+    "sourceCredibility": "Brief assessment",
+    "factualIndicators": "Brief assessment",
+    "redFlags": ["flag1", "flag2"] or []
+  }
+}`;
 
-Respond ONLY with this exact JSON format:
-{"trustLevel": "true|suspicious|false", "confidence": 0.0-1.0, "reasoning": "brief explanation"}`;
+    const userMessage = `Analyze this web content for credibility:
+
+TITLE/HEADLINE: ${headline || 'No title'}
+
+SOURCE: ${source}
+
+CONTENT:
+${contentToAnalyze.slice(0, 4000)}
+
+Provide your credibility analysis as JSON.`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -75,10 +104,7 @@ Respond ONLY with this exact JSON format:
         model: 'google/gemini-2.5-flash',
         messages: [
           { role: 'system', content: systemPrompt },
-          { 
-            role: 'user', 
-            content: `Analyze this news article:\n\nHeadline: ${headline}\n\nExcerpt: ${excerpt}\n\nSource: ${source}\n\nRespond with JSON only.`
-          }
+          { role: 'user', content: userMessage }
         ],
       }),
     });
@@ -87,8 +113,15 @@ Respond ONLY with this exact JSON format:
       const errorText = await response.text();
       console.error('AI Gateway error:', response.status, errorText);
       
+      if (response.status === 429) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Rate limit exceeded. Please try again in a moment.' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       // Fallback to rule-based analysis
-      const result = analyzeWithRules(headline, excerpt, source);
+      const result = analyzeWithRules(headline, contentToAnalyze, source);
       return new Response(
         JSON.stringify({ success: true, ...result }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -98,7 +131,7 @@ Respond ONLY with this exact JSON format:
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || '';
     
-    console.log('AI response:', content);
+    console.log('AI response:', content.slice(0, 500));
 
     // Parse the AI response
     let result: AnalysisResult;
@@ -121,13 +154,14 @@ Respond ONLY with this exact JSON format:
         trustLevel: parsed.trustLevel || 'suspicious',
         confidence: Math.min(1, Math.max(0, parsed.confidence || 0.5)),
         reasoning: parsed.reasoning || 'Analysis complete.',
+        details: parsed.details || undefined,
       };
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError);
-      result = analyzeWithRules(headline, excerpt, source);
+      result = analyzeWithRules(headline, contentToAnalyze, source);
     }
 
-    console.log(`Analysis result: ${result.trustLevel} (${result.confidence})`);
+    console.log(`Analysis result: ${result.trustLevel} (confidence: ${result.confidence})`);
 
     return new Response(
       JSON.stringify({ success: true, ...result }),
@@ -135,7 +169,7 @@ Respond ONLY with this exact JSON format:
     );
 
   } catch (error) {
-    console.error('Error analyzing article:', error);
+    console.error('Error analyzing content:', error);
     return new Response(
       JSON.stringify({ 
         success: true, 
@@ -148,44 +182,60 @@ Respond ONLY with this exact JSON format:
   }
 });
 
-function analyzeWithRules(headline: string, excerpt: string, source: string): AnalysisResult {
-  const text = `${headline} ${excerpt}`.toLowerCase();
+function analyzeWithRules(headline: string, content: string, source: string): AnalysisResult {
+  const text = `${headline} ${content}`.toLowerCase();
   
   // Credibility indicators
-  const credibleSources = ['reuters', 'bbc', 'apnews', 'npr', 'wsj', 'nytimes', 'bloomberg', 'nature', 'science', 'nasa'];
-  const sensationalWords = ['shocking', 'unbelievable', 'you won\'t believe', 'breaking', 'exclusive', 'urgent', 'alert'];
-  const conspiracyWords = ['cover-up', 'they don\'t want you to know', 'secret', 'conspiracy', 'hoax', 'fake'];
-  const uncertainWords = ['reportedly', 'allegedly', 'sources say', 'may', 'might', 'could'];
+  const credibleSources = ['reuters', 'bbc', 'apnews', 'npr', 'wsj', 'nytimes', 'bloomberg', 'nature', 'science', 'nasa', 'gov', 'edu', 'theguardian', 'economist', 'ft.com'];
+  const sensationalWords = ['shocking', 'unbelievable', 'you won\'t believe', 'exclusive', 'urgent', 'alert', 'exposed', 'bombshell', 'horrifying', 'insane'];
+  const conspiracyWords = ['cover-up', 'they don\'t want you to know', 'secret', 'conspiracy', 'hoax', 'fake news', 'wake up', 'sheeple', 'globalist', 'deep state'];
+  const uncertainWords = ['reportedly', 'allegedly', 'sources say', 'rumored', 'unconfirmed'];
+  const credibilityWords = ['according to', 'study shows', 'research indicates', 'data suggests', 'experts say', 'peer-reviewed'];
   
   let score = 0.5; // Start neutral
   let reasons: string[] = [];
+  let redFlags: string[] = [];
 
   // Check source credibility
   const sourceLower = source.toLowerCase();
   if (credibleSources.some(s => sourceLower.includes(s))) {
     score += 0.2;
-    reasons.push('Credible source');
+    reasons.push('Established news source');
+  }
+
+  // Check for credibility indicators
+  const credibilityCount = credibilityWords.filter(w => text.includes(w)).length;
+  if (credibilityCount >= 2) {
+    score += 0.1;
+    reasons.push('Contains citations and references');
   }
 
   // Check for sensationalism
   const sensationalCount = sensationalWords.filter(w => text.includes(w)).length;
   if (sensationalCount > 0) {
     score -= 0.1 * sensationalCount;
-    reasons.push('Sensational language detected');
+    redFlags.push('Sensational language detected');
   }
 
   // Check for conspiracy language
   const conspiracyCount = conspiracyWords.filter(w => text.includes(w)).length;
   if (conspiracyCount > 0) {
     score -= 0.2 * conspiracyCount;
-    reasons.push('Conspiracy indicators found');
+    redFlags.push('Conspiracy-related language found');
   }
 
-  // Check for hedging language (moderate concern)
+  // Check for excessive uncertainty
   const uncertainCount = uncertainWords.filter(w => text.includes(w)).length;
-  if (uncertainCount > 2) {
-    score -= 0.05;
-    reasons.push('Multiple unverified claims');
+  if (uncertainCount > 3) {
+    score -= 0.1;
+    redFlags.push('Many unverified claims');
+  }
+
+  // Check for ALL CAPS (common in misinformation)
+  const capsRatio = (text.match(/[A-Z]{3,}/g) || []).length / (text.split(' ').length || 1);
+  if (capsRatio > 0.1) {
+    score -= 0.1;
+    redFlags.push('Excessive capitalization');
   }
 
   // Normalize score
@@ -201,9 +251,21 @@ function analyzeWithRules(headline: string, excerpt: string, source: string): An
     trustLevel = 'false';
   }
 
+  const reasoning = reasons.length > 0 
+    ? reasons.join('. ') + (redFlags.length > 0 ? '. However: ' + redFlags.join(', ') : '')
+    : redFlags.length > 0 
+      ? redFlags.join('. ') 
+      : 'Standard credibility assessment based on content analysis.';
+
   return {
     trustLevel,
-    confidence: Math.abs(score - 0.5) * 2, // Convert to confidence measure
-    reasoning: reasons.length > 0 ? reasons.join('. ') : 'Standard credibility assessment.',
+    confidence: Math.abs(score - 0.5) * 2,
+    reasoning,
+    details: {
+      languageTone: sensationalCount > 0 ? 'Sensational' : 'Neutral',
+      sourceCredibility: credibleSources.some(s => sourceLower.includes(s)) ? 'Established' : 'Unknown',
+      factualIndicators: credibilityCount > 0 ? 'Some citations present' : 'Limited citations',
+      redFlags,
+    },
   };
 }
