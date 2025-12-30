@@ -5,14 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// News sources to scrape from
-const NEWS_SOURCES = [
-  'https://news.google.com',
-  'https://www.bbc.com/news',
-  'https://www.reuters.com',
-  'https://apnews.com',
-];
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -29,7 +21,12 @@ serve(async (req) => {
       );
     }
 
-    console.log('Starting news search...');
+    // Get search query from request body, default to general trending news
+    const body = await req.json().catch(() => ({}));
+    const searchQuery = body.query || 'breaking news today headlines trending';
+    const sourceId = body.sourceId || 'general';
+
+    console.log(`Starting news search for source: ${sourceId}, query: ${searchQuery}`);
 
     // Use Firecrawl search to find recent news
     const searchResponse = await fetch('https://api.firecrawl.dev/v1/search', {
@@ -39,8 +36,8 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        query: 'breaking news today headlines',
-        limit: 10,
+        query: searchQuery,
+        limit: 12,
         tbs: 'qdr:d', // Last 24 hours
         scrapeOptions: {
           formats: ['markdown'],
@@ -66,14 +63,15 @@ serve(async (req) => {
     console.log('Search results:', JSON.stringify(searchData).slice(0, 500));
 
     // Transform search results into articles
-    const articles = (searchData.data || []).slice(0, 8).map((result: any, index: number) => ({
-      id: `article-${Date.now()}-${index}`,
+    const articles = (searchData.data || []).slice(0, 12).map((result: any, index: number) => ({
+      id: `${sourceId}-${Date.now()}-${index}`,
       headline: result.title || 'Untitled Article',
       excerpt: extractExcerpt(result.markdown || result.description || ''),
       source: extractDomain(result.url || ''),
       url: result.url,
       timestamp: new Date().toISOString(),
       status: 'pending' as const,
+      sourceId: sourceId,
     }));
 
     // If we got no articles, return mock data
