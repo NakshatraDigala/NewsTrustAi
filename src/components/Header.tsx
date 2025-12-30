@@ -1,12 +1,11 @@
-import { Shield, RefreshCw } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Shield } from "lucide-react";
 
 interface HeaderProps {
   isRefreshing: boolean;
   lastUpdated: Date | null;
 }
 
-export function Header({ isRefreshing, lastUpdated }: HeaderProps) {
+export function Header({ isRefreshing }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 glass-card border-b border-border/50">
       <div className="container mx-auto px-4 py-4">
@@ -18,42 +17,32 @@ export function Header({ isRefreshing, lastUpdated }: HeaderProps) {
                   <Shield className="w-5 h-5 text-foreground" />
                 </div>
               </div>
+              {isRefreshing && (
+                <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-trust-suspicious animate-pulse" />
+              )}
             </div>
             <div>
               <h1 className="font-display font-bold text-xl tracking-tight text-foreground">
                 NewsTrust AI
               </h1>
               <p className="text-xs text-muted-foreground">
-                Autonomous misinformation detection
+                Real-time credibility analysis
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <RefreshCw 
-              className={cn(
-                "w-4 h-4 text-muted-foreground",
-                isRefreshing && "animate-spin"
-              )} 
-            />
-            {lastUpdated && (
-              <span className="text-xs text-text-tertiary">
-                Updated {formatTimeAgo(lastUpdated)}
-              </span>
-            )}
+          <div className="flex items-center gap-4">
+            <a 
+              href="https://docs.lovable.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              How it works
+            </a>
           </div>
         </div>
       </div>
     </header>
   );
-}
-
-function formatTimeAgo(date: Date): string {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  
-  if (seconds < 60) return 'just now';
-  if (seconds < 120) return '1 min ago';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} mins ago`;
-  if (seconds < 7200) return '1 hour ago';
-  return `${Math.floor(seconds / 3600)} hours ago`;
 }
