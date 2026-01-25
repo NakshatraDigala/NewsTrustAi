@@ -2,7 +2,7 @@
 
 ## Project info
 
-**URL**: newstrustai.netlify.app
+**URL**: https://newstrustai.netlify.app/
 
 ## How can I edit this code?
 
